@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "api/*.js", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/r/(?<code>[^/]+)", "dest": "/student.html?code=$code" },
+    { "src": "/api/(.*)", "dest": "/api/$1" }
+  ],
+  "functions": {
+    "api/index.js": { "memory": 1024, "maxDuration": 10 }
+  }
+}
