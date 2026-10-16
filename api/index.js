@@ -4,28 +4,30 @@ const bodyParser = require('body-parser');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const sqlite3 = require('sqlite3').verbose();
-
-const { Pool } = (() => {
-  try { return require('pg'); } catch (e) { return {}; }
-})();
+const { Pool } = require('pg');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret';
 const TOKEN_EXP = '7d';
-
 const app = express();
 app.use(bodyParser.json());
 
-// Database abstraction: Postgres if DATABASE_URL present, else SQLite
 let dbType = 'sqlite';
 let sqliteDb = null;
 let pgPool = null;
+let dbReadyPromise = null;
+
+function getDbPath() {
+  if (process.env.VERCEL) return '/tmp/data.db';
+  return process.env.DB_PATH || './data.db';
+}
 
 async function initDb() {
   if (process.env.DATABASE_URL) {
     dbType = 'pg';
-    const { Pool } = require('pg');
-    pgPool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.PGSSLMODE === 'require' ? { rejectUnauthorized: false } : false });
-    // create tables if not exist
+    pgPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.PGSSLMODE === 'require' ? { rejectUnauthorized: false } : false
+    });
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS teachers (
         id SERIAL PRIMARY KEY,
@@ -52,35 +54,44 @@ async function initDb() {
         created_at BIGINT
       );
     `);
-  } else {
-    dbType = 'sqlite';
-    const DB_PATH = process.env.DB_PATH || './data.db';
-    sqliteDb = new sqlite3.Database(DB_PATH);
+    console.log('DB initialized: Postgres');
+    return;
+  }
+
+  dbType = 'sqlite';
+  sqliteDb = new sqlite3.Database(getDbPath());
+  await new Promise((resolve, reject) => {
     sqliteDb.serialize(() => {
       sqliteDb.run(`CREATE TABLE IF NOT EXISTS teachers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
         email TEXT UNIQUE,
         password TEXT
-      )`);
-
-      sqliteDb.run(`CREATE TABLE IF NOT EXISTS qr_codes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        code TEXT UNIQUE,
-        teacher_id INTEGER,
-        created_at INTEGER
-      )`);
-
-      sqliteDb.run(`CREATE TABLE IF NOT EXISTS students (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        qr_id INTEGER,
-        name TEXT,
-        grade TEXT,
-        section TEXT,
-        created_at INTEGER
-      )`);
+      )`, (err) => {
+        if (err) return reject(err);
+        sqliteDb.run(`CREATE TABLE IF NOT EXISTS qr_codes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          code TEXT UNIQUE,
+          teacher_id INTEGER,
+          created_at INTEGER
+        )`, (err2) => {
+          if (err2) return reject(err2);
+          sqliteDb.run(`CREATE TABLE IF NOT EXISTS students (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            qr_id INTEGER,
+            name TEXT,
+            grade TEXT,
+            section TEXT,
+            created_at INTEGER
+          )`, (err3) => {
+            if (err3) return reject(err3);
+            console.log('DB initialized: SQLite at', getDbPath());
+            resolve();
+          });
+        });
+      });
     });
-  }
+  });
 }
 
 function generateCode() {
@@ -102,7 +113,26 @@ function authMiddleware(req, res, next) {
   }
 }
 
-// API routes
+app.use(async (req, res, next) => {
+  if (!dbReadyPromise) {
+    dbReadyPromise = initDb().catch((err) => {
+      console.error('DB init failed:', err);
+      throw err;
+    });
+  }
+  try {
+    await dbReadyPromise;
+    next();
+  } catch (err) {
+    console.error('Request blocked because DB init failed:', err);
+    res.status(500).json({ error: 'Database initialization failed' });
+  }
+});
+
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, dbType, env: { hasJwtSecret: !!process.env.JWT_SECRET, hasDbUrl: !!process.env.DATABASE_URL } });
+});
+
 app.post('/api/signup', async (req, res) => {
   const { name, email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'email and password required' });
@@ -122,6 +152,7 @@ app.post('/api/signup', async (req, res) => {
       });
     }
   } catch (err) {
+    console.error('signup error:', err);
     res.status(500).json({ error: 'server error' });
   }
 });
@@ -151,6 +182,7 @@ app.post('/api/login', async (req, res) => {
       });
     }
   } catch (err) {
+    console.error('login error:', err);
     res.status(500).json({ error: 'server error' });
   }
 });
@@ -170,6 +202,7 @@ app.post('/api/qr', authMiddleware, async (req, res) => {
       });
     }
   } catch (err) {
+    console.error('create qr error:', err);
     res.status(500).json({ error: 'server error' });
   }
 });
@@ -187,6 +220,7 @@ app.get('/api/qr', authMiddleware, async (req, res) => {
       });
     }
   } catch (err) {
+    console.error('list qr error:', err);
     res.status(500).json({ error: 'server error' });
   }
 });
@@ -211,6 +245,7 @@ app.get('/api/qr/:id/students', authMiddleware, async (req, res) => {
       });
     }
   } catch (err) {
+    console.error('student list error:', err);
     res.status(500).json({ error: 'server error' });
   }
 });
@@ -240,11 +275,10 @@ app.post('/api/attend/:code', async (req, res) => {
       });
     }
   } catch (err) {
+    console.error('attendance error:', err);
     res.status(500).json({ error: 'server error' });
   }
 });
 
-// Expose the app for local testing via /api - Vercel will use this handler
-initDb().catch(console.error);
-
+module.exports = app;
 module.exports.handler = serverless(app);
