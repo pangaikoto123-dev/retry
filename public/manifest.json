@@ -1,0 +1,12 @@
+{
+  "name": "QR Attendance",
+  "short_name": "QRAttend",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "description": "QR code attendance app for teachers and students",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Teacher Dashboard - QR Attendance</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <h1>Teacher Dashboard</h1>
+  </header>
+  <main>
+    <section id="auth">
+      <h2>Sign up / Sign in</h2>
+      <div>
+        <input id="name" placeholder="Name (signup)">
+        <input id="email" placeholder="Email">
+        <input id="password" type="password" placeholder="Password">
+        <button id="signup">Sign Up</button>
+        <button id="login">Log In</button>
+      </div>
+      <div id="auth-msg" class="muted"></div>
+    </section>
+
+    <section id="dashboard" style="display:none;">
+      <h2>Welcome, <span id="teacher-name"></span></h2>
+      <button id="create-qr">Create QR Code</button>
+      <div id="qrs"></div>
+    </section>
+  </main>
+  <script src="/js/teacher.js"></script>
+</body>
+</html>

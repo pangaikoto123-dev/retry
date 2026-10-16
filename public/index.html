@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>QR Attendance - PWA</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <h1>QR Attendance</h1>
+  </header>
+  <main>
+    <section>
+      <h2>About</h2>
+      <p>This app allows teachers to quickly take attendance by generating a random QR code. Students scan the QR code, are redirected to a short form where they enter name, grade, and section, and the teacher can view a live list of who scanned and submitted their info.</p>
+    </section>
+
+    <section>
+      <h2>Get Started</h2>
+      <p>Teachers: create an account or sign in to create QR codes and see attendance.</p>
+      <a class="button" href="/teacher.html">Teacher sign in / dashboard</a>
+    </section>
+
+    <section>
+      <h2>PWA</h2>
+      <p>This site is a Progressive Web App. Install it on your device for offline access to the teacher dashboard (cached pages).</p>
+    </section>
+  </main>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
+    }
+  </script>
+</body>
+</html>
